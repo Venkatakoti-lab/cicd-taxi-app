@@ -7,6 +7,11 @@ pipeline {
         SONAR_TOKEN = credentials('SONAR_TOKEN')
     }
     stages{
+        stage('Cleanup') {
+            steps {
+                cleanWs()
+            }
+        }
         stage('build'){
             steps{
                 echo "#####BUILD STARTED #########"
