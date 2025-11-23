@@ -21,20 +21,7 @@ pipeline {
                 echo "###### UNIT TEST COMPLETED #########"
             }
         }
-        stage('SonarQube Analysis') {
-            steps {
-                script {
-                    // Run SonarQube analysis
-                    sh """
-                    mvn sonar:sonar \
-                    -Dsonar.projectKey=taxi-app112 \
-                    -Dsonar.organization=taxi-app112 \
-                    -Dsonar.host.url=https://sonarcloud.io \
-                    -Dsonar.token=${SONAR_TOKEN}
-                    """
-                }
-            }
-        }
+        
         stage('Cleanup') {
             steps {
                 cleanWs()
