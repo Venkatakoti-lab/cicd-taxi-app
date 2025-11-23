@@ -18,7 +18,7 @@ pipeline {
             steps{
                 echo "##### UNIT TEST STARTED #####"
                 sh 'mvn surefire-report:report'
-                echo "###### UNIT TEST COMPLETED ########"
+                echo "###### UNIT TEST COMPLETED #########"
             }
         }
         stage('SonarQube Analysis') {
