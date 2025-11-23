@@ -27,7 +27,7 @@ resource "aws_instance" "jenkins_master" {
 
 resource "aws_instance" "jenkins_slave" {
   ami                    = var.ami_id
-  instance_type          = "t2.small"
+  instance_type          = "t2.medium"
   key_name               = "yadav"
   vpc_security_group_ids = [aws_security_group.demo-sg.id]
 
