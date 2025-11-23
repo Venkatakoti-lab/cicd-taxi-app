@@ -16,7 +16,7 @@ pipeline {
             steps{
                 echo "#####BUILD STARTED #########"
                 sh 'mvn package'
-                echo "##### BUILD COMPLETED #######"
+                echo "##### BUILD COMPLETED ########"
             }
         }
         stage('test'){
