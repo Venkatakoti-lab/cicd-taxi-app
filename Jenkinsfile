@@ -32,8 +32,8 @@ pipeline {
                     // Run SonarQube analysis
                     sh """
                     mvn sonar:sonar \
-                    -Dsonar.projectKey=taxi-app11 \
-                    -Dsonar.organization=taxi-app11 \
+                    -Dsonar.projectKey=taxi-app112 \
+                    -Dsonar.organization=taxi-app112 \
                     -Dsonar.host.url=https://sonarcloud.io \
                     -Dsonar.token=${SONAR_TOKEN}
                     """
