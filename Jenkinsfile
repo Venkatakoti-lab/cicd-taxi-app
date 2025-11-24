@@ -82,6 +82,11 @@ pipeline {
                 }
             }
         }
+        stage (" Container Deployment"){
+            steps{
+                sh 'sudo docker run -d --name taxiapp -p 8000:8080 trialycxxke.jfrog.io/taxi-docker-local/taxiapp'
+            }
+        }
         stage('Cleanup') {
             steps {
                 cleanWs()
