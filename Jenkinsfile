@@ -1,4 +1,6 @@
 def registry = 'https://trialycxxke.jfrog.io/artifactory'
+def imageName = 'trialycxxke.jfrog.io/taxi-docker-local/taxiapp'
+def version   = '1.0.1'
 
 pipeline {
     agent {
@@ -60,8 +62,26 @@ pipeline {
                 }
             }   
         }
-
-
+        stage(" Docker Build ") {
+            steps {
+                script {
+                    echo '<--------------- Docker Build Started --------------->'
+                    app = docker.build(imageName+":"+version)
+                    echo '<--------------- Docker Build Ends --------------->'
+                }
+            }
+        }
+        stage (" Docker Publish "){
+            steps {
+                script {
+                    echo '<--------------- Docker Publish Started --------------->'  
+                        docker.withRegistry(registry, 'jfrog-cred'){
+                            app.push()
+                        }    
+                    echo '<--------------- Docker Publish Ended --------------->'  
+                }
+            }
+        }
         stage('Cleanup') {
             steps {
                 cleanWs()
