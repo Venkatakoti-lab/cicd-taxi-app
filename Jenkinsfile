@@ -82,7 +82,13 @@ pipeline {
                 }
             }
         }
-        
+        stage(" Deploy ") {
+            steps {
+                script {
+                    sh './deploy.sh'
+                }
+            }
+        }
         stage('Cleanup') {
             steps {
                 cleanWs()
