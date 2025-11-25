@@ -9,7 +9,6 @@ pipeline {
     environment {
         PATH = "/opt/apache-maven-3.9.11/bin:${env.PATH}"
         SONAR_TOKEN = credentials('SONAR_TOKEN')
-        jfrog-cred = credentials(jfrog-cred)
     }
     stages{
         stage('build'){
