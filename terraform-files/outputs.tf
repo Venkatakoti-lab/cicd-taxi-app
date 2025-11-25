@@ -4,6 +4,6 @@ output "ansible_info" {
 output "master_info" {
   value = aws_instance.jenkins_master.public_ip
 }
-output "slave_info" {
-  value = aws_instance.jenkins_slave.public_ip
-}
+# output "slave_info" {
+#   value = aws_instance.jenkins_slave.public_ip
+# }
