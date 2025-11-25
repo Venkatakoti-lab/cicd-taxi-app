@@ -1,0 +1,807 @@
+1. Create a folder in your local system.
+2. Open git bash from that folder.
+3. Now clone the repository to your folder by giving the command (git clone <git_url>.
+4. It was downloaded to your folder.
+5. Now Change the Directory to the taxi-booking folder cloned to your folder.
+6. Now rename the taxi-booking folder name to cicd-taxiapp/ by giving the command (mv taxi-booking/ cicd-taxiapp/).
+7. Goto browser and open your GitHub, Create a new repository with name cicd-taxiapp.
+8. Now in git bash do the following commands to push our code to GitHub repository.
+   * cd cicd-taxiapp/
+   * ls 
+   * git remote add origin https://github.com//cicd-taxiapp.git (your GitHub repository url).
+   * git remote set-url origin https://github.com/Sairamguthula8/cicd-taxiapp.git (your GitHub repository url).
+   * git branch -M main (change dev to the main branch)
+   * git push -u origin main 
+9. Now create another folder in cicd-taxiapp/ name it as terraform_files/ by typing command in gitbash
+   * mkdir terraform_files
+10. Goto terraform_files folder by giving the command (cd terraform_files/)
+11. In that folder create a file to write a terraform script to create infrastructure.
+    * touch taxi-infra.tf
+    * vi .gitignore 
+    Add these 4 lines 
+     **/*.tfstate
+     **/*.tfstate.**
+     **/.terraform/*
+     **/.terraform.lock.hcl
+:wq to save the file
+
+12. Then open Vscode to edit the file by giving command (code .)
+13. In the taskbar you can see that Vscode blinking tab, open it, and click on taxi-infra.tf file, paste the script below.
+
+*** Note: In script change the ami, key_name and region.*** and follow my repo i have set all the required..
+   ----------------------------------
+provider "aws" {
+  region = "ap-southeast-2"
+}
+data "aws_vpc" "default" {
+  default = true
+}
+
+# Get default subnets
+data "aws_subnets" "default" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
+}
+
+resource "aws_instance" "ansible" {
+    ami                     = "ami-01e2093820bf84df1"
+    instance_type           = "t2.micro"
+    key_name                = "taxi"
+    vpc_security_group_ids  = [aws_security_group.demo-sg.id]
+    //subnet_id               = "subnet-077471d3c705ea769"
+    tags                    = {
+        Name      = "ansible"
+    }
+}
+    
+
+
+resource "aws_instance" "jenkins_master" {
+  ami                        = "ami-01e2093820bf84df1"
+  instance_type              = "t2.medium"
+  key_name                   = "taxi"
+  vpc_security_group_ids     = [aws_security_group.demo-sg.id]
+  
+  tags                       = {
+    Name = "jenkins-master"
+  }
+  
+
+}
+
+resource "aws_instance" "jenkins_slave" {
+  ami                        = "ami-01e2093820bf84df1"
+  instance_type              = "t2.medium"
+  key_name                   = "taxi"
+  vpc_security_group_ids     = [aws_security_group.demo-sg.id]
+  
+  tags                       = {
+    Name = "jenkins-slave"
+  }
+  
+}
+
+
+resource "aws_security_group" "demo-sg" {
+  name        = "demo-sg"
+  description = "SSH Access"
+
+  
+  ingress {
+    description      = "SHH access"
+    from_port        = 22
+    to_port          = 22
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+    }
+
+    ingress {
+    description      = "Jenkins port"
+    from_port        = 8080
+    to_port          = 8080
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+    }
+    ingress {
+    description      = "Container  port"
+    from_port        = 8000
+    to_port          = 8000
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+    }
+    ingress {
+    description      = "https  port"
+    from_port        = 443
+    to_port          = 443
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+    }
+    ingress {
+    description      = "http  port"
+    from_port        = 80
+    to_port          = 80
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+    }
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  tags = {
+    Name = "ssh-port"
+
+  }
+}
+
+
+
+----------------------------------------
+Save the file
+
+14. Then open terminal in vs code now give command aws configure and paste accesskey, secretkey and region.
+15. now apply below terraform commnds to create infrastructure.
+    * terraform init
+    * terraform validate
+    * terraform plan
+    * terraform apply
+16. You can check in console now servers are created in console.
+17. Now connect to ansible server and install ansible by using below commands.
+    * sudo apt update
+    * sudo apt install software-properties-common
+    * sudo add-apt-repository --yes --update ppa:ansible/ansible
+    * sudo apt install ansible
+    * ansible --version
+18. Now open gitbash in cicd-taxiapp/ folder and create another folder with name Ansible/
+     * mkdir Ansible
+     * cd Ansible/
+     * give code . to open vs code
+19. In Vscode select Ansible folder and Add files hosts, jenkins-master-setup.yaml and jenkins-slave-setup.yaml files.
+   and paste the below content in each file.
+   ---------in hosts file-----
+[jenkins-master]
+10.1.1.132
+
+[jenkins-master:vars]
+ansible_user=ubuntu
+ansible_ssh_private_key_file=/opt/taxi.pem
+
+[jenkins-slave]
+10.1.1.55
+
+[jenkins-slave:vars]
+ansible_user=ubuntu
+ansible_ssh_private_key_file=/opt/taxi.pem
+-------------------------------
+
+-------------jenkins-master-setup.yaml----------------------
+---
+- hosts: jenkins-master
+  become: true
+  tasks:
+  - name: add jenkins key
+    apt_key:
+      url:  https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+      state: present
+
+  - name: add jenkins repo
+    apt_repository:
+      repo: 'deb https://pkg.jenkins.io/debian-stable binary/'
+      state: present
+
+  - name: install java
+    apt:
+      name: openjdk-17-jre
+      state: present
+
+  - name: install jenkins
+    apt:
+      name: jenkins
+      state: present
+
+  - name: start jenkins service
+    service:
+      name: jenkins
+      state: started
+
+  - name: enable jenkins to start at boot time
+    service:
+      name: jenkins
+      enabled: yes
+-----------------------------------------------------
+
+---------------jenkins-slave-setup.yaml-------------------------
+---
+- hosts: jenkins-slave
+  become: true
+  tasks: 
+  - name: update ubuntu repo and cache
+    apt:
+      update_cache: yes
+      cache_valid_time: 3600
+
+  - name: install java
+    apt:
+      name: openjdk-17-jre
+      state: present
+
+  - name: download maven packages
+    get_url:
+      url: https://dlcdn.apache.org/maven/maven-3/3.9.11/binaries/apache-maven-3.9.11-bin.tar.gz
+      dest: /opt
+
+  - name: extract maven packages
+    unarchive:
+      src: /opt/apache-maven-3.9.11-bin.tar.gz
+      dest: /opt
+      remote_src: yes
+
+  - name: install docker
+    apt:
+      name: docker.io
+      state: present
+
+  - name: start docker services
+    service:
+      name: docker
+      state: started
+  - name: give 777 permissions on /var/run/docker.sock
+    file:
+      path: /var/run/docker.sock
+      state: file
+      mode: 0777
+
+  - name: start docker on boot time
+    service:
+     name: docker
+     enabled: yes
+------------------------------------------------------
+
+20. Now goto Ansible server and give the below commands and run the ansible-playbooks.
+    * sudo -i
+    * cd /opt
+    * And create the above 3 files in this directory to run playbooks
+    * vi taxi.pem file copy the downloaded pem key and paste the key and save the file
+    * chmod 400 taxi.pem (give only read permissions to taxi.pem file for users)
+    * vi hosts file copy the hosts script from vscode and paste the script and save the file
+    * vi jenkins-master-setup.yaml file copy the hosts script from vscode and paste the script and save the file
+    * vi jenkins-slave-setup.yaml file copy the hosts script from vscode and paste the script and save the file
+
+21. Now run the below commands to install the scripts by using ansible-playbook commnds
+    * ansible all -i hosts -m ping  (type yes and yes to continue)
+when we get an error with says one of the server is unreachable then please follow the below steps
+ansible <jenkins master/slave Private IP address> -i hosts -m ping  (for which ever the machine we get unreachable status , please include the IP address into the command and run the command once again as shown below as an example)
+Example: ansible 172.31.22.211 -i hosts -m ping
+still you are facing error perform below command
+
+ssh -o StrictHostKeyChecking=no -i /opt/yadav.pem ubuntu@Jenkins_master/slave_ip
+
+Now we get a sucess message , so now thenm follow the same step ansible -m ping all to retrive the status of the two servers
+    * ansible-playbook -i /opt/hosts jenkins-master-setup.yaml
+    * ansible-playbook -i /opt/hosts jenkins-slave-setup.yaml
+when we run the ablove playbook , jenkins-slave we get a maven error as belo
+{TASK [download maven packages] ********************************************************************************************************************
+fatal: [172.31.23.143]: FAILED! => {"changed": false, "dest": "/opt", "elapsed": 0, "gid": 0, "group": "root", "mode": "0755", "msg": "Request failed", "owner": "root", "response": "HTTP Error 404: Not Found", "size": 4096, "state": "directory", "status_code": 404, "uid": 0, "url": "https://dlcdn.apache.org/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz"}
+To resolve this issue , we go for the updated version of the maven that need to be included in the yaml file at the same time , thats need be updted in the VS code yaml file,
+please find the updtes version statement as below
+https://dlcdn.apache.org/maven/maven-3/3.9.11/binaries/apache-maven-3.9.11-bin.tar.gz
+after the updated the slave playbook,please run the playbook once again (ansible-playbook -i /opt/hosts jenkins-slave-setup.yaml)
+
+22. Now check the installations by connecting to two servers of jenkins-master and build-slave
+    * In jenkins-master server check Jenkins was active status by entering command (systemctl status jenkins)
+    * In build-slave server check docker and mvn by using below commands
+    * docker --version
+    * sudo -i
+    * cd /opt
+    * cd apache-maven-3.9.11
+    * cd bin
+    * ls
+    * ./mvn --version
+23. Now copy the jenkins-master public ip and goto webpage and paste with port :8080
+    * copy the /var/lib/jenkins/secrets/initialAdminPassword path and paste in your jenkins-master server by 
+      giving command sudo cat with the path, and copy paste the password to signup to Jenkins dashboard.
+24. Now in Jenkins dashboard -----> Manage Jenkins -----> Plugins -----> Available Plugins -----> Select Artifactory, 
+    Pipeline: stageview, Docker Pipeline -----> Install without restart
+
+25. Now goto manage Jenkins -----> credentials -----> global -----> kind: SSH username with privatekey ----->
+    ID: master-slave -----> Description: master-slave configuration -----> username: ubuntu -----> enter directly
+    in that copy and paste taxi.pem key.
+26. Now goto manage Jenkins -----> nodes -----> Name: taxi-app -----> description: master-slave configuration
+    -----> Number of executors: 3 -----> Remote root directory: /home/ubuntu/jenkins -----> Labels: maven
+    -----> Usage: Use this node as much as possible -----> Launch method: Launch agents via SSH ----->
+    Host: Private key of build slave -----> Credentials: we added credentials -----> Host Key Verification Strategy:
+    Non verifying Verification strategy -----> Availability: Keep this agent online as much as possible
+27. Now goto gitbash and create Jenkinsfile in cicd-taxiapp/ folder by using commands
+   We already find an jenkinsfile , please try to remove it by using the command ( rm -f jenkisfile )and follow the below steps
+* touch Jenkinsfile
+    * code .
+    * and copy and paste the pipeline stages
+---------------------------
+pipeline {
+    agent {
+        node {
+            label 'maven'
+        }
+    }
+environment {
+    PATH = "/opt/apache-maven-3.9.11/bin:$PATH"
+    
+}
+   stages {
+        stage("build"){
+            steps {
+                 echo "----------- build started ----------"
+                sh 'mvn package'
+                 echo "----------- build complted ----------"
+            }
+        }
+}
+}
+---------------------------------------
+if you want you can skip 28 line bcz we are using public_repo
+28. Before commit and pushing the Jenkinsfile to  github, Generate the token for this goto GitHub -----> Profile -----> Settings -----> left side scroll down at 
+    last you have Developer Settings -----> Personal Access token (classic) -----> Generate New Token (classic) -----> In Note name as Github Token -----> Check all
+    the boxes and Generate token and copy& paste to your notepad and commit and push to github
+     (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- github token)
+29. Now Signin to Jenkins Dashboard -----> Manage Jenkins -----> Credentials -----> Kind: Username with Password -----> username: github -----> password: Paste the
+    generated github token -----> ID: github_cred -----> Description -----> github credentials -----> Save
+30. Now in Dashboard -----> New Item -----> Name: taxi-booking -----> Select Pipeline -----> Create
+31. Configure ------> Description: master slave with Jenkins and maven -----> Select Discard old builds -----> In Max # of builds to keep: 4 ------> Pipeline
+    -----> Definition: Pipeline Script from SCM -----> Repository URL: your github project URL -----> Credentials: Select added github credentials ----->
+    Branch Specifier: */main -----> Script Path: Jenkinsfile -----> Apply & Save ----> Click on Build Now
+(Befor we run build now mannually , we need to add the file by using the command ( git add filename as shown below
+git add Jenkinsfile and now commit the file by using the below command
+git commit filename -m "Jenkinsfile updated" and Now push the Jenkinsfile by using the below command
+
+32. Now Add Webhooks to trigger Automatically for this goto Github and your repository cicd-taxiapp -----> Settings -----> Webhooks -----> Add Webhook
+    -----> Content type: application/json -----> Payload URL: http://3.108.228.162(your jenkins publipip):8080//github-webhook/ -----> Add Webhook
+33. Now goto Jenkins Dashboard -----> taxi-booking -----> Configure -----> Build Triggers: GitHub hook trigger for GITScm polling -----. Apply & save
+34. Add below stage in Jenkinsfile and then commit and push to github, pipeline will be automatically run by triggering of webhook
+    stage("test"){
+            steps{
+                echo "----------- unit test started ----------"
+                sh 'mvn surefire-report:report'
+                 echo "----------- unit test Complted ----------"
+            }
+        }
+35. Now we need to do Code Analysis test by using Sonarcloud for this go to google take new tab and search for Sonarcloud.io.
+36. Sign in by using GitHub credentials and login to GitHub, Right side above you have      '+' symbol -----> 
+Create new organization -----> Click on create one manually -----> Enter Organization name--taxi-app010203 and choose plan select free plan and click on create organization
+ 
+37. Now click on Analyze project in Myprojects -----> give display name - taxi and project key will generated automatcically , select public radio buton and click on Next
+
+Now we get another page Set up Project wher we need to select previous version and create a project 
+
+Choose Your Analysis Method and select manually and click on Maven 
+
+-----> now select Manually -----> Maven ------> It will give the details take the details Copy and paste.
+    * SONAR_TOKEN
+    * 6c51924d998d11e7f916de8235bfc16a193ae117
+    * <properties>
+        <sonar.organization>taxi-app11</sonar.organization>
+      </properties>
+    * mvn verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=taxi-app11_taxi
+   
+38. In Jenkisfile add below lines after step 8
+    * in environment stage add another line 
+	 (SONAR_TOKEN = credentials('SONAR_TOKEN'))
+    * After test stage that is step no27 add another stage 
+---------------------------------
+      stage('SonarQube Analysis') {
+            steps {
+                script {
+                    // Run SonarQube analysis
+                    sh """
+                    mvn sonar:sonar \
+                    -Dsonar.projectKey=taxi-app11 \
+                    -Dsonar.organization=taxi-app11 \
+                    -Dsonar.host.url=https://sonarcloud.io \
+                    -Dsonar.token=${SONAR_TOKEN}
+                    """
+                }
+            }
+        }
+--------------------------------------
+39. Now add another credentials in Jenkins Dashboard  -----> Manage Jenkins -----> Credentials -----> Kind: Secret text -----> Copy and Paste the token which was in 37th point -----> 
+    ID: SONAR_TOKEN -----> Description: sonar credentials
+43. Now save the pipeline commit and push to GitHub it will automatically trigger and build the pipeline 
+44. ==========
+    * In google search for jfrog.com -----> start free -----> sign in with github and give first name - taxiand last name - app-----> 
+     Renamea it Hostname:taxi05  and Select aws cloud and Cloud Region - Us -east-1
+     Confirm Start Free Trail------> 
+      
+    * jfrog environment will be created again sign in with google.
+    * go to profile on the right sie and click on  -->quick repository creation -->select maven --> give name --> taxi --> and create.
+    * go to Application ------> artifactory -->artifacts then we will see the created repositories.
+    * goto Administration on the top tab------> user management --> access token --> generate token -----> scoped token -----> description:jenkins-access-token -----> token:scope:admin ---> username - gmail id what u gave for login
+      -----> user name: email adderess used for jfrog resgitration
+      generate
+      copy the token to the notepad  
+      eyJ2ZXIiOiIyIiwidHlwIjo
+
+    
+   * goto jenkins -----> manage Jenkins ------> credentials ------> system global credentials add credentials -----> kind:username with password
+	username:mail id provided for jfrog
+	password copied token
+	id : jfrog-cred 
+	create
+
+    * goto manage jenkins -->plugin -->avaliable plugins --> artifactory -->install
+
+    * add  jarpublish stage to jenkinsfile commit and push
+
+  ===================
+
+sysntax : def registry = 'https://<yourJFrogURL>/' ##add this at the top of the pipeline code in line 1
+
+def registry = 'https://trialycxxke.jfrog.io/artifactory'(this u can copy from the browser url) add at step 1
+
+and add the stage next to SonarQube analysis
+
+At sTep 42  check once where u need to add 
+
+stage("Jar Publish") {
+        steps {
+            script {
+                    echo '<--------------- Jar Publish Started --------------->'
+                     def server = Artifactory.newServer url:registry+"/artifactory" ,  credentialsId:"jfrog-cred"
+                     def properties = "buildid=${env.BUILD_ID},commitid=${GIT_COMMIT}";
+                     def uploadSpec = """{
+                          "files": [
+                            {
+                              "pattern": "/home/ubuntu/jenkins/workspace/taxi-booking/taxi-booking/target/(*)",
+                              "target": "taxi-libs-release-local/{1}",
+                              "flat": "false",
+                              "props" : "${properties}",
+                              "exclusions": [ "*.sha1", "*.md5"]
+                            }
+                         ]
+                     }"""
+                     def buildInfo = server.upload(uploadSpec)
+                     buildInfo.env.collect()
+                     server.publishBuildInfo(buildInfo)
+                     echo '<--------------- Jar Publish Ended --------------->'  
+             }
+        }   
+    }
+
+
+
+If error come remove text pattern in +"/artifactory"  def server line 
+==============
+45. go to jfrog and check the taxi-libs-release-local we will see the artifacts
+46. Now open Dockerfile and edit with below script/file
+------------------
+From tomcat:9 
+LABEL project="taxi-cicd" \
+      environment="dev"
+COPY ./taxi-booking/target/taxi-booking-1.0.1.war /usr/local/tomcat/webapps
+EXPOSE 8080
+--------------------
+47. save and push to the github
+* Build now 
+ we will get Dockerfile in the slave server taxibooking
+*login to jfrog
+open Quick repository creation
+select docker
+prefix: taxi
+
+* go to artifactory --> artifacts to check repositories
+* go to Jenkins -->manage jenkins -->plugins -->docker pipeline -->install
+* add docker stages to jenkins pipeline 
+------------
+add these in the top of the Jenkinsfile in VScode above the pipeline in 2nd line
+
+def imageName = 'taxi01.jfrog.io/taxi-docker-local/taxiapp'
+def version   = '1.0.1'
+---------
+Add the stage after the jar publish stage
+stage(" Docker Build ") {
+      steps {
+        script {
+           echo '<--------------- Docker Build Started --------------->'
+           app = docker.build(imageName+":"+version)
+           echo '<--------------- Docker Build Ends --------------->'
+        }
+      }
+    }
+     stage (" Docker Publish "){
+        steps {
+            script {
+               echo '<--------------- Docker Publish Started --------------->'  
+                docker.withRegistry(registry, 'jfrog-cred'){
+                    app.push()
+                }    
+               echo '<--------------- Docker Publish Ended --------------->'  
+            }
+        }
+    }
+ -----------   
+commit and push
+48. go to jfrog and check the taxi-docker-local we will see the artifacts of docker image
+49. goto build slave and check the images by using command
+    * docker images  
+    * sudo docker run -dt --name taxiapp -p 8000:8080 taxi01.jfrog.io/taxi-docker-local/taxiapp:1.0.1
+      change the image name as per your image name.
+    * by giving this url can see the webpage of taxi-booking, http://13.232.154.85(your build-slave publicip):8000/taxi-booking-1.0.1/
+50. In terraform_files of taxi-infra.tf  add two modules to creates our eks cluster.
+-------------------------
+
+  module "sgs" {
+  source = "../sg_eks"
+  vpc_id = data.aws_vpc.default.id
+}
+
+# EKS Cluster Module
+module "eks" {
+  source     = "../eks"
+  vpc_id     = data.aws_vpc.default.id
+  subnet_ids = data.aws_subnets.default.ids
+  sg_ids     = module.sgs.security_group_public
+}
+
+
+output "eks_cluster_endpoint" {
+  value = module.eks.endpoint
+}
+  ----------------------------
+And Apply Terraform Commands to Create Cluster and now push to your github from bash 
+
+51. now open terminal change directory to terraform_files and give below commands
+    * terraform init
+    * terraform validate
+    * terraform plan
+    * terraform apply
+52. After Created you eks and node groups go and check into your console.
+
+* Connect to jenkins-slave server
+
+Install Aws configure
+
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+sudo apt install unzip
+unzip awscliv2.zip
+sudo ./aws/install
+aws --version
+and then Confirure by using command
+aws configure
+Access key ----
+Secret key ---
+Region of your server ----
+Output ---- hit Enter
+53. Npow install kubectl in your build-slave server
+     * curl -L -o kubectl https://dl.k8s.io/release/stable.txt
+     * curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+     * sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+     * kubectl version --client
+     * aws eks --region ap-south-1 describe-cluster --name taxi-eks-01 --query cluster.status
+     * aws eks --region ap-south-1 update-kubeconfig --name taxi-eks-01
+     * kubectl get nodes
+54. Now go to jfrog -> Administration -> user management -> users -> create new user -> enter user name and email select adminster platform -> enter password ->save.
+55. Now goto build slave server and type the below commands
+    * sudo -i
+    * docker login https://taxi01.jfrog.io/ 
+    * And enter username and password created in jfrog it will show output as Login Suceeded
+    * cat .docker/config.json | base64 -w0
+    * you can see the generated token by using above command, copy and paste in your notepad
+    * ewoJImF1dGhzIjogewoJCSJ0cmlhbHljeHhrZS5qZnJvZy5pbyI6IHsKCQkJImF1dGgiOiAiYTI5MGFUcEJaRzFwYmtBeE1qTT0iCgkJfQoJ
+and exit from root.
+56. Now install helm in your build-slave server by using below commands
+     * curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+     * chmod 700 get_helm.sh
+     * ./get_helm.sh
+     * helm version
+     * helm list
+     * helm repo add stable https://charts.helm.sh/stable
+     * helm repo list
+     * helm search repo jenkins
+57. Now we will create a project for deployment by using below commands
+    * helm create taxiapp
+    * cd taxiapp/
+    * ls
+    * cd templates/
+    * ls
+    * rm -rf * 
+    * ls
+    * vi deployment.yaml
+    * vi namespace.yaml
+    * vi secrets.yaml
+    * vi service.yaml
+    * cd 
+    * helm install taxiapp ./taxiapp
+
+you will get output like this:
+  helm install taxiapp ./taxiapp
+NAME: taxiapp
+LAST DEPLOYED: Tue Nov 25 10:38:30 2025
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+
+    * kubectl get ns
+    * kubectl get all -n taxi
+   
+    * Now by using loadbalancer dns name access the webpage (http://ad79ed77624e44b92a6265281c6e002a-372389794.ap-south-1.elb.amazonaws.com:8001/taxi-booking-1.0.1/)
+58. Now we are creating service monitoring tools by using below commands
+kubectl create namespace monitoring
+
+helm repo list
+
+ helm repo add prometheus-grafana-community https://prometheus-community.github.io/helm-charts
+
+ helm repo list
+helm repo update
+helm pull prometheus-grafana-community/kube-prometheus-stack
+ ls
+
+ tar -xzvf kube-prometheus-stack-79.7.1.tgz 
+ ls
+ cd kube-prometheus-stack/
+ ls
+
+ cd templates/
+ ls
+
+ helm install prometheus prometheus-grafana-community/kube-prometheus-stack --namespace monitoring
+
+
+ cd
+kubectl get all
+kubectl get all -n monitoring
+
+
+
+ 
+-----
+Now edit and change  the type  remove ClusterIP and add LoadBalancer
+ubuntu@ip-10-1-1-176:~$ kubectl edit svc prometheus-kube-prometheus-prometheus -n monitoring
+
+here type: change to LoadBalancer
+
+after :wq! 
+you see edited popup
+
+service/prometheus-kube-prometheus-prometheus edited
+ubuntu@ip-10-1-1-176:~$ kubectl edit svc prometheus-grafana -n monitoring
+here also change load balancer
+ 
+service/prometheus-grafana edited
+
+kubectl get all -n monitoring
+------------------
+
+Here you see LB DNS names:
+
+Now copy the DNS entry and search it in browser http://aa975e77f4ce9475786c7920cd35c5c4-1590920884.us-east-1.elb.amazonaws.com:9090/query  -->Prometheus
+
+a789e83a2643f41349003cd20f61ae9a-706390848.us-east-1.elb.amazonaws.com:80  -->Grafana
+Grafana:
+username -admin
+password - prom-operator
+
+if you get error: try this command to get password
+
+kubectl get secret -n monitoring prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 --decode; echo
+
+
+--------------------------------
+-----
+
+
+ubuntu@ip-10-1-1-176:~$ kubectl get ns
+NAME              STATUS   AGE
+default           Active   88m
+kube-node-lease   Active   88m
+kube-public       Active   88m
+kube-system       Active   88m
+monitoring        Active   23m
+taxi            Active   31m
+ubuntu@ip-10-1-1-176:~$ kubectl delete ns taxi
+namespace "taxi" deleted
+^Cubuntu@ip-10-1-1-176:~$ rm -rf taxiapp/
+ubuntu@ip-10-1-1-176:~$ ls
+aws  awscliv2.zip  get_helm.sh  jenkins  kube-prometheus-stack  kube-prometheus-stack-61.3.1.tgz
+ubuntu@ip-10-1-1-176:~$ 
+
+
+---------------------
+------------------------
+Now deploy via direct pipeline with jenkins
+
+copy the deploy namespace, service,secret, deployment, deploy.sh files to taxi-booking of your project folder.(tweet-trend)
+
+
+ create a file deploy.sh
+
+
+copy & paste the deploy stage pipeline code to the Jenkinsfile.
+===========================
+stage(" Deploy ") {
+       steps {
+         script {
+            sh './deploy.sh'
+         }
+       }
+     }
+==========================
+     Commit and push it will automatically build the stage
+if you get permissions denied error:
+
+ git add --chmod=+x deploy.sh
+ git add .
+ git commit -m "message"git 
+now
+>git push origin main
+
+if u are still face error
+
+configure aws creds in Jenkins
+and add this stage in Jenkins file: and push the code
+
+##########################
+stage("Deploy") {
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+                    sh '''
+                        echo "===== AWS Authentication Check ====="
+                        aws sts get-caller-identity
+
+                        echo "===== Updating kubeconfig ====="
+                        aws eks update-kubeconfig --name expense --region us-east-1
+
+                        echo "===== Applying Kubernetes Manifests ====="
+                        chmod +x deploy.sh
+                        ./deploy.sh
+                    '''
+                }
+            }
+        }
+
+######################
+---------------------
+ubuntu@ip-10-1-1-176:~$ kubectl get ns
+
+ubuntu@ip-10-1-1-176:~$ kubectl get all -n monitoring
+
+
+
+http://ab1625fc384de4db2b07935d4f7937a1-303989148.ap-south-1.elb.amazonaws.com:8001/taxi-booking-1.0.1/
+
+------------
+* After your project completion, we have to destroy/uninstall servers & Cluster for this go to your project where your terraform code was executed and open git bash here type
+
+* terraform deploy --auto-approve
+-----------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
