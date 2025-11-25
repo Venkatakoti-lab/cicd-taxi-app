@@ -82,15 +82,24 @@ pipeline {
                 }
             }
         }
-        stage(" Deploy ") {
+        stage("Deploy") {
             steps {
-                script {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
                     sh '''
-                           ./deploy.sh
+                        echo "===== AWS Authentication Check ====="
+                        aws sts get-caller-identity
+
+                        echo "===== Updating kubeconfig ====="
+                        aws eks update-kubeconfig --name expense --region us-east-1
+
+                        echo "===== Applying Kubernetes Manifests ====="
+                        chmod +x deploy.sh
+                        ./deploy.sh
                     '''
                 }
             }
         }
+
         stage('Cleanup') {
             steps {
                 cleanWs()
