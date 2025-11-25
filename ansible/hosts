@@ -1,12 +1,12 @@
 [jenkins-master]
-172.31.23.209
+172.31.28.245
 
 [jenkins-master:vars]
 ansible_user=ubuntu
 ansible_ssh_private_key_file=/opt/yadav.pem
 
 [jenkins-slave]
-172.31.28.78
+172.31.18.45
 
 [jenkins-slave:vars]
 ansible_user=ubuntu
