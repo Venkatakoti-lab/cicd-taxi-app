@@ -75,7 +75,7 @@ pipeline {
             steps {
                 script {
                     echo '<--------------- Docker Publish Started --------------->'  
-                        docker.withRegistry('https://trialycxxke.jfrog.io', 'jfrog-cred'){
+                        docker.withRegistry(registry, 'jfrog-cred'){
                             app.push()
                         }    
                     echo '<--------------- Docker Publish Ended --------------->'  
